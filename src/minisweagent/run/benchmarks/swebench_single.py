@@ -41,8 +41,8 @@ Examples:
 # fmt: off
 @app.command()
 def main(
-    subset: str = typer.Option("lite", "--subset", help="SWEBench subset to use or path to a dataset", rich_help_panel="Data selection"),
-    split: str = typer.Option("dev", "--split", help="Dataset split", rich_help_panel="Data selection"),
+    subset: str = typer.Option("verified", "--subset", help="SWEBench subset to use or path to a dataset", rich_help_panel="Data selection"),
+    split: str = typer.Option("test", "--split", help="Dataset split", rich_help_panel="Data selection"),
     instance_spec: str = typer.Option(0, "-i", "--instance", help="SWE-Bench instance ID or index", rich_help_panel="Data selection"),
     model_name: str | None = typer.Option(None, "-m", "--model", help="Model to use", rich_help_panel="Basic"),
     model_class: str | None = typer.Option(None, "--model-class", help="Model class to use (e.g., 'anthropic' or 'minisweagent.models.anthropic.AnthropicModel')", rich_help_panel="Advanced"),
@@ -93,7 +93,8 @@ def main(
         config.get("agent", {}),
         default_type="interactive",
     )
-    agent.run(instance["problem_statement"])
+    res = agent.run(instance["problem_statement"])
+    print(res)
 
 
 if __name__ == "__main__":

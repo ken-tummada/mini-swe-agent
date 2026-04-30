@@ -96,6 +96,7 @@ class DockerEnvironment:
             check=True,
         )
         self.logger.info(f"Started container {container_name} with ID {result.stdout.strip()}")
+        self.container_name = container_name
         self.container_id = result.stdout.strip()
 
     def execute(self, action: dict, cwd: str = "", *, timeout: int | None = None) -> dict[str, Any]:

@@ -5,6 +5,7 @@
 
 import concurrent.futures
 import json
+from os import path
 import random
 import re
 import threading
@@ -52,7 +53,7 @@ DEFAULT_CONFIG_FILE = builtin_config_dir / "benchmarks" / "swebench.yaml"
 
 DATASET_MAPPING = {
     "full": "princeton-nlp/SWE-Bench",
-    "verified": "princeton-nlp/SWE-Bench_Verified",
+    "verified": "SWE-bench/SWE-Bench_Verified",
     "lite": "princeton-nlp/SWE-Bench_Lite",
     "multimodal": "princeton-nlp/SWE-Bench_Multimodal",
     "multilingual": "swe-bench/SWE-Bench_Multilingual",
@@ -105,6 +106,33 @@ def get_sb_environment(config: dict, instance: dict) -> Environment:
         out = env.execute(startup_command)
         if out["returncode"] != 0:
             raise RuntimeError(f"Error executing startup command: {out}")
+
+    logger.debug(f"image_name: {image_name}")
+
+    task_id = instance.get("instance_id")
+
+    if task_id is None:
+        # FIXME: full implement this
+        task_name = re.match(r"docker\.io/swebench/sweb\.eval\..+\.([a-zA-Z0-9_-]*)", image_name)
+        task_id = ""
+
+    # FIXME: allow for dataset path
+    patch_path = Path("./evaluation/bash-only/20260217_mini-v2.0.0_claude-4-5-opus-high/logs/") / task_id / "patch.diff"
+
+    import subprocess
+
+    out = subprocess.run(
+        [
+            "docker",
+            "cp",
+            patch_path.absolute().as_posix(),
+            f"{env.container_name}:/testbed/patch.diff",  # type: ignore
+        ]
+    )
+
+    if out.returncode != 0:
+        raise RuntimeError(f"Error executing cp command: {out}")
+
     return env
 
 
@@ -214,10 +242,11 @@ def filter_instances(
 # fmt: off
 @app.command(help=_HELP_TEXT)
 def main(
-    subset: str = typer.Option("lite", "--subset", help="SWEBench subset to use or path to a dataset", rich_help_panel="Data selection"),
-    split: str = typer.Option("dev", "--split", help="Dataset split", rich_help_panel="Data selection"),
+    subset: str = typer.Option("verified", "--subset", help="SWEBench subset to use or path to a dataset", rich_help_panel="Data selection"),
+    split: str = typer.Option("test", "--split", help="Dataset split", rich_help_panel="Data selection"),
     slice_spec: str = typer.Option("", "--slice", help="Slice specification (e.g., '0:5' for first 5 instances)", rich_help_panel="Data selection"),
     filter_spec: str = typer.Option("", "--filter", help="Filter instance IDs by regex", rich_help_panel="Data selection"),
+    dataset: str = typer.Option("bash-only/20260217_mini-v2.0.0_claude-4-5-opus-high", "--dataset", help="Data of previously submitted traj"),
     shuffle: bool = typer.Option(False, "--shuffle", help="Shuffle instances", rich_help_panel="Data selection"),
     output: str = typer.Option("", "-o", "--output", help="Output directory", rich_help_panel="Basic"),
     workers: int = typer.Option(1, "-w", "--workers", help="Number of worker threads for parallel processing", rich_help_panel="Basic"),

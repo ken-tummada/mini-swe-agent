@@ -62,6 +62,7 @@ class LitellmModel:
 
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
+            logger.debug("Hello world!")
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
