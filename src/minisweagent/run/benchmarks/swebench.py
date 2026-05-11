@@ -111,14 +111,8 @@ def get_sb_environment(config: dict, instance: dict) -> Environment:
 
     task_id = instance.get("instance_id")
 
-    if task_id is None:
-        # FIXME: full implement this
-        task_name = re.match(r"docker\.io/swebench/sweb\.eval\..+\.([a-zA-Z0-9_-]*)", image_name)
-        task_id = ""
-
-    # FIXME: allow for dataset path
-    patch_path = Path("./evaluation/bash-only/20260217_mini-v2.0.0_claude-4-5-opus-high/logs/") / task_id / "patch.diff"
-
+    dataset_dir = config["dataset"]
+    patch_path = Path(dataset_dir) / "logs" / task_id / "patch.diff"
     import subprocess
 
     out = subprocess.run(
@@ -131,7 +125,8 @@ def get_sb_environment(config: dict, instance: dict) -> Environment:
     )
 
     if out.returncode != 0:
-        raise RuntimeError(f"Error executing cp command: {out}")
+        logger.error(f"Error executing cp command: {out}")
+        raise RuntimeError
 
     return env
 
@@ -242,11 +237,9 @@ def filter_instances(
 # fmt: off
 @app.command(help=_HELP_TEXT)
 def main(
-    subset: str = typer.Option("verified", "--subset", help="SWEBench subset to use or path to a dataset", rich_help_panel="Data selection"),
-    split: str = typer.Option("test", "--split", help="Dataset split", rich_help_panel="Data selection"),
+    dataset: str | None = typer.Option(None, "--dataset", help="Path to dataset", rich_help_panel="Basic"),
     slice_spec: str = typer.Option("", "--slice", help="Slice specification (e.g., '0:5' for first 5 instances)", rich_help_panel="Data selection"),
     filter_spec: str = typer.Option("", "--filter", help="Filter instance IDs by regex", rich_help_panel="Data selection"),
-    dataset: str = typer.Option("bash-only/20260217_mini-v2.0.0_claude-4-5-opus-high", "--dataset", help="Data of previously submitted traj"),
     shuffle: bool = typer.Option(False, "--shuffle", help="Shuffle instances", rich_help_panel="Data selection"),
     output: str = typer.Option("", "-o", "--output", help="Output directory", rich_help_panel="Basic"),
     workers: int = typer.Option(1, "-w", "--workers", help="Number of worker threads for parallel processing", rich_help_panel="Basic"),
@@ -256,6 +249,33 @@ def main(
     config_spec: list[str] = typer.Option([str(DEFAULT_CONFIG_FILE)], "-c", "--config", help=_CONFIG_SPEC_HELP_TEXT, rich_help_panel="Basic"),
     environment_class: str | None = typer.Option(None, "--environment-class", help="Environment type to use. Recommended are docker or singularity", rich_help_panel="Advanced"),
 ) -> None:
+
+    if dataset is None:
+        logger.error("--dataset can't be None")
+        exit(1)
+
+    dataset_dir = Path(dataset)
+
+    if not dataset_dir.exists():
+        logger.error(f"Dataset {dataset_dir.absolute().as_posix()} doesn't exists")
+        exit(1)
+
+    dataset_metadata_path = dataset_dir / "logs" / "metadata.json"
+    
+    if not dataset_metadata_path.exists():
+        logger.error(f"Dataset {dataset} is invalid")
+        exit(1)
+
+    with open(dataset_metadata_path) as f:
+        dataset_metadata = json.load(f)
+        subset = dataset_metadata.get("subset", "").replace("swe-bench_", "")
+        split = dataset_metadata.get("split", "")
+
+    if "" in [subset, split]:
+        logger.error(f"Dataset {dataset} is invalid")
+        exit(1)
+
+
     # fmt: on
     output_path = Path(output)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -280,6 +300,7 @@ def main(
     configs.append({
         "environment": {"environment_class": environment_class or UNSET},
         "model": {"model_name": model or UNSET, "model_class": model_class or UNSET},
+        "dataset": dataset_dir.absolute().as_posix(),
     })
     config = recursive_merge(*configs)
 
