@@ -189,6 +189,7 @@ def process_instance(
             **config.get("agent", {}),
         )
         info = agent.run(task)
+        # TODO: extract the steps from agent
         exit_status = info.get("exit_status")
         result = info.get("submission")
     except Exception as e:
@@ -239,8 +240,6 @@ def filter_instances(
 def main(
     dataset: str | None = typer.Option(None, "--dataset", help="Path to dataset", rich_help_panel="Basic"),
     slice_spec: str = typer.Option("", "--slice", help="Slice specification (e.g., '0:5' for first 5 instances)", rich_help_panel="Data selection"),
-    filter_spec: str = typer.Option("", "--filter", help="Filter instance IDs by regex", rich_help_panel="Data selection"),
-    shuffle: bool = typer.Option(False, "--shuffle", help="Shuffle instances", rich_help_panel="Data selection"),
     output: str = typer.Option("", "-o", "--output", help="Output directory", rich_help_panel="Basic"),
     workers: int = typer.Option(1, "-w", "--workers", help="Number of worker threads for parallel processing", rich_help_panel="Basic"),
     model: str | None = typer.Option(None, "-m", "--model", help="Model to use", rich_help_panel="Basic"),
@@ -249,6 +248,8 @@ def main(
     config_spec: list[str] = typer.Option([str(DEFAULT_CONFIG_FILE)], "-c", "--config", help=_CONFIG_SPEC_HELP_TEXT, rich_help_panel="Basic"),
     environment_class: str | None = typer.Option(None, "--environment-class", help="Environment type to use. Recommended are docker or singularity", rich_help_panel="Advanced"),
 ) -> None:
+    filter_spec = ""
+    shuffle = False
 
     if dataset is None:
         logger.error("--dataset can't be None")
@@ -303,6 +304,9 @@ def main(
         "dataset": dataset_dir.absolute().as_posix(),
     })
     config = recursive_merge(*configs)
+
+    with open(output_path / "run_config.json", "w") as f:
+        json.dump({"model": model, "dataset": dataset}, f)
 
     progress_manager = RunBatchProgressManager(len(instances), output_path / f"exit_statuses_{time.time()}.yaml")
 

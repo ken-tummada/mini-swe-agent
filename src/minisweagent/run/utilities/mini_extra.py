@@ -15,6 +15,7 @@ subcommands = [
     ("minisweagent.run.utilities.inspector", ["inspect", "i", "inspector"], "Run inspector (browse trajectories)"),
     ("minisweagent.run.benchmarks.swebench", ["swebench"], "Evaluate on SWE-bench (batch mode)"),
     ("minisweagent.run.benchmarks.swebench_single", ["swebench-single"], "Evaluate on SWE-bench (single instance)"),
+    ("minisweagent.run.benchmarks.swebench_test", ["swebench-test"], "Run SWE-bench test suites only (no agent)"),
 ]
 
 
